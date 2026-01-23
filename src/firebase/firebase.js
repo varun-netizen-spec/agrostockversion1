@@ -5,12 +5,7 @@ import { getFirestore } from "firebase/firestore";
 // TODO: Replace with your actual Firebase project configuration
 // These should ideally be environment variables in a real production app.
 const firebaseConfig = {
-  apiKey: 123,
-  authDomain: 6678,
-  projectId: 345,
-  storageBucket: 345,
-  messagingSenderId: 789,
-  appId: 5679
+// Paste your firebase config
 };
 
 const app = initializeApp(firebaseConfig);
