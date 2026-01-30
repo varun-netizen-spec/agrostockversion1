@@ -1,68 +1,104 @@
-# AgroStock Management Platform
+# 🌾 AgroStock - Advanced Dairy Farm Management System
 
-AgroStock is a modern, premium SaaS web application designed for cattle farmers and dairy farm managers. It provides a centralized dashboard for tracking herd health, managing farm profiles, and optimizing feed consumption using AI-driven insights.
+AgroStock is a premium, AI-powered SaaS platform designed to revolutionize dairy farm management. It combines comprehensive cattle tracking, financial analytics, and intelligent marketplace features with cutting-edge AI tools to optimize farm productivity and profitability.
 
-## ✨ Features
+![AgroStock Banner](https://via.placeholder.com/1200x400?text=AgroStock+Management+Platform)
 
-- **🛡️ Secure Authentication**: Personal registration and login for Farmers and Admins using Firebase Auth.
-- **🚜 Farm Management**: Create and maintain detailed farm profiles including location and herd size.
-- **🐄 Cattle Inventory**: Track individual cattle by Tag ID, age, and breed with searchable list views.
-- **🏥 Health Timeline**: Monitor vaccinations, illness history, and upcoming medical due dates.
-- **💡 Feed Optimizer**: Get AI-based feed recommendations to improve milk yield and reduce cost.
-- **💎 Premium UI**: Modern dark-mode aesthetic with glassmorphism and smooth micro-animations.
+## ✨ Key Features
 
-## 🚀 Tech Stack
+### 📊 Intelligent Dashboard
+- **Real-time Overview**: Instant visualization of herd statistics, milk production, and financial health.
+- **Alerts & Notifications**: Smart reminders for vaccinations, low feed stock, and health anomalies.
 
-- **Frontend**: [React.js](https://reactjs.org/) + [Vite](https://vitejs.dev/)
-- **Styling**: Vanilla CSS (Custom Variable System)
-- **Backend & DB**: [Firebase](https://firebase.google.com/) (Auth & Firestore)
-- **Icons**: [Lucide React](https://lucide.dev/)
+### 🐄 Cattle Management
+- **Detailed Profiles**: Track individual cattle by Tag ID, breed, age, and weight.
+- **Lifecycle Tracking**: Monitor growth stages from calf to milking cow.
+- **Health Records**: Comprehensive history of vaccinations, treatments, and AI-driven disease diagnosis.
+- **Cattle Health Scanner**: **(AI-Powered)** Upload images/videos of cattle to detect diseases (Lumpy Skin, Foot & Mouth, etc.) using computer vision.
 
-## 🛠️ Setup Instructions
+### 💰 Financial Analytics
+- **Profit & Loss**: Detailed breakdown of revenue (milk sales, cattle sales) vs. expenses (feed, medical).
+- **Cost Analysis**: Track cost per cattle and feed efficiency.
+- **Visual Reports**: Interactive charts and graphs for financial trends.
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd bro
-   ```
+### 🥗 Smart Feed Optimizer
+- **AI Recommendations**: get scientifically balanced feed mixes based on cattle weight, milk field, and available ingredients.
+- **Inventory Management**: Track feed stock levels and get low-stock alerts.
 
-2. **Install dependencies**:
-   ```bash
-   npm install --legacy-peer-deps
-   ```
+### 🏪 Marketplace
+- **Buy & Sell**: A dedicated platform for farmers to trade cattle, feed, and equipment.
+- **Order Management**: Track orders, shipments, and transaction history.
+- **Product Intelligence**: Insights into market trends and pricing.
 
-3. **Configure Firebase**:
-   Open `src/firebase/firebase.js` and ensure the `firebaseConfig` object contains your project credentials.
+### 🧠 Advanced AI Capabilities
+- **Gemini Assistant**: Integrated AI chatbot for general farming queries and advice.
+- **Anomaly Detection**: Algorithms to spot irregular patterns in milk production or health metrics.
 
-4. **Environment Setup**:
-   Ensure you have enabled the following in your [Firebase Console](https://console.firebase.google.com/):
-   - **Authentication**: Enable Email/Password method.
-   - **Firestore Database**: Initialize in Test Mode (or apply security rules).
+## 🚀 Technology Stack
 
-5. **Run the Development Server**:
-   ```bash
-   npm run dev
-   ```
+- **Frontend**: [React.js](https://reactjs.org/) (Vite)
+- **State Management**: React Context API
+- **Routing**: React Router v6
+- **Styling**: Modern CSS3 with Custom Properties (Glassmorphism & animated UI)
+- **Backend**: [Firebase](https://firebase.google.com/) (Authentication, Firestore, Storage)
+- **AI/ML**: Google Gemini API, Custom ML Models (TensorFlow/Keras for disease detection)
+- **Visualization**: Recharts
+- **Utilities**: Lucide React (Icons), jsPDF (Reports), XLSX (Excel export)
+
+## 🛠️ Installation & Setup
+
+1.  **Clone the Repository**
+    ```bash
+    git clone https://github.com/yourusername/agrostock.git
+    cd agrostock
+    ```
+
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
+
+3.  **Configure Firebase**
+    - Create a project in the [Firebase Console](https://console.firebase.google.com/).
+    - Enable **Authentication** (Email/Password).
+    - Enable **Firestore Database** and **Storage**.
+    - Copy your Firebase config object.
+    - Update `src/firebase/firebase.js` with your credentials:
+      ```javascript
+      const firebaseConfig = {
+        apiKey: "YOUR_API_KEY",
+        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+        projectId: "YOUR_PROJECT_ID",
+        storageBucket: "YOUR_PROJECT_ID.appspot.com",
+        // ...
+      };
+      ```
+
+4.  **Run Development Server**
+    ```bash
+    npm run dev
+    ```
 
 ## 📂 Project Structure
 
-```text
+```
 src/
-├── components/      # Reusable UI components (Sidebar, etc.)
-├── context/         # Auth state management
-├── firebase/        # Firebase configuration
-├── pages/           # Individual module screens
-│   ├── Login.jsx
-│   ├── Register.jsx
+├── components/       # Reusable UI components (Sidebar, Charts, Cards)
+├── context/         # Global state (Auth, Data)
+├── firebase/        # Firebase configuration and initializers
+├── pages/           # Application views
 │   ├── Dashboard.jsx
 │   ├── CattleList.jsx
 │   ├── HealthRecords.jsx
-│   └── FeedOptimizer.jsx
-├── App.jsx          # Main routing logic
-├── index.css        # Core design system
-└── main.jsx         # Entry point
+│   ├── FinancialAnalytics.jsx
+│   ├── Marketplace.jsx
+│   ├── FeedOptimizer.jsx
+│   ├── CattleHealthScanner.jsx (AI)
+│   └── ...
+├── services/        # Logic & API layers
+│   ├── geminiService.js   # AI integration
+│   ├── FeedService.js     # Nutrition logic
+│   └── ...
+├── styles/          # Global styles and themes
+└── App.jsx          # Main routing & layout
 ```
-
-## 📜 License
-
-This project is open-source and available under the MIT License.
