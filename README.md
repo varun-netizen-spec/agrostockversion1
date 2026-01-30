@@ -2,7 +2,6 @@
 
 AgroStock is a premium, AI-powered SaaS platform designed to revolutionize dairy farm management. It combines comprehensive cattle tracking, financial analytics, and intelligent marketplace features with cutting-edge AI tools to optimize farm productivity and profitability.
 
-![AgroStock Banner](https://via.placeholder.com/1200x400?text=AgroStock+Management+Platform)
 
 ## ✨ Key Features
 
