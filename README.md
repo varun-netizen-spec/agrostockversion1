@@ -7,7 +7,7 @@ AgroStock is a premium, AI-powered SaaS platform designed to revolutionize dairy
 
 ### 📊 Intelligent Dashboard
 - **Real-time Overview**: Instant visualization of herd statistics, milk production, and financial health.
-- **Alerts & Notifications**: Smart reminders for vaccinations, low feed stock, and health anomalies.
+- **Alerts & Notifications**: Smart reminders for vaccinations, low feed stock, and health anomalies .
 
 ### 🐄 Cattle Management
 - **Detailed Profiles**: Track individual cattle by Tag ID, breed, age, and weight.
