@@ -9,6 +9,7 @@ export default function Dashboard() {
     const [stats, setStats] = useState({
         totalCattle: 0,
         healthAlerts: 0,
+        monthlyincome=0,
         vaccinationsDue: 0,
         avgYield: 0
     });
