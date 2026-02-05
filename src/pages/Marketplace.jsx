@@ -22,13 +22,13 @@ export default function Marketplace() {
         fetchProducts();
 
         // Smart Polling Strategy:
-        // 1. High frequency (8s) when tab is active for "near real-time" feel.
+        // 1. High frequency (5s) when tab is active for "near real-time" feel.
         // 2. Stop entirely when tab is hidden to save reads.
         const intervalId = setInterval(() => {
             if (!document.hidden) {
                 fetchProducts(true);
             }
-        }, 8000);
+        }, 5000);
 
         return () => clearInterval(intervalId);
     }, [userData]);
@@ -181,7 +181,7 @@ export default function Marketplace() {
                             const matchesFresh = filters.onlyFresh ? ['Milk', 'Curd', 'Paneer'].includes(p.category) : true;
                             return matchesSearch && matchesPrice && matchesQty && matchesFresh;
                         }).map(product => (
-                            <div key={product.id} className="glass-panel cattle-card" style={{ padding: 0, overflow: 'hidden' }}>
+                            <div key={product.id} className="glass-panel cattle-card" style={{ padding: 0, overflow: 'hidden', border: product.healthRisk === 'High' ? '1px solid #ef4444' : product.healthRisk === 'Medium' ? '1px solid #f59e0b' : 'none' }}>
                                 <div style={{
                                     height: '180px',
                                     background: 'var(--bg-tertiary)',
@@ -192,10 +192,25 @@ export default function Marketplace() {
                                     position: 'relative'
                                 }}>
                                     {product.category === 'Milk' ? '🥛' : product.category === 'Ghee' ? '🍯' : '🧀'}
+
+                                    {/* Health Risk Badge */}
+                                    {product.healthRisk && product.healthRisk !== 'Low' && (
+                                        <div style={{
+                                            position: 'absolute', top: '10px', right: '10px',
+                                            background: product.healthRisk === 'High' ? '#ef4444' : '#f59e0b',
+                                            color: '#fff', padding: '4px 8px', borderRadius: '6px',
+                                            fontSize: '0.75rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '4px'
+                                        }}>
+                                            <AlertTriangle size={12} />
+                                            {product.healthRisk === 'High' ? 'Safety Risk' : 'Advisory'}
+                                        </div>
+                                    )}
                                 </div>
                                 <div style={{ padding: '1.25rem' }}>
+                                    {/* ... existing header ... */}
                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
                                         <h3 style={{ fontSize: '1.125rem' }}>{product.name}</h3>
+                                        {/* ... existing rating ... */}
                                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.4rem' }}>
                                             <div style={{ fontSize: '0.75rem', color: 'var(--accent-primary)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
                                                 <MapPin size={12} />
@@ -207,6 +222,19 @@ export default function Marketplace() {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {/* Advisory Text */}
+                                    {product.healthRisk === 'Medium' && (
+                                        <div style={{ fontSize: '0.75rem', color: '#f59e0b', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <AlertTriangle size={12} /> Check farm health status
+                                        </div>
+                                    )}
+                                    {product.healthRisk === 'High' && (
+                                        <div style={{ fontSize: '0.75rem', color: '#ef4444', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            <AlertTriangle size={12} /> Seller Temporarily Restricted
+                                        </div>
+                                    )}
+
                                     <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                                         <MapPin size={14} />
                                         {product.category} Section
@@ -225,17 +253,19 @@ export default function Marketplace() {
                                             </div>
                                         ) : (
                                             <button
-                                                onClick={() => toggleCart(product.id, 1)}
+                                                onClick={() => product.healthRisk !== 'High' && toggleCart(product.id, 1)}
+                                                disabled={product.healthRisk === 'High'}
                                                 style={{
-                                                    background: 'var(--accent-primary)',
+                                                    background: product.healthRisk === 'High' ? '#ccc' : 'var(--accent-primary)',
                                                     color: '#fff',
                                                     padding: '0.5rem 1rem',
                                                     borderRadius: '6px',
                                                     fontSize: '0.875rem',
-                                                    fontWeight: '600'
+                                                    fontWeight: '600',
+                                                    cursor: product.healthRisk === 'High' ? 'not-allowed' : 'pointer'
                                                 }}
                                             >
-                                                ADD
+                                                {product.healthRisk === 'High' ? 'Blocked' : 'ADD'}
                                             </button>
                                         )}
                                     </div>

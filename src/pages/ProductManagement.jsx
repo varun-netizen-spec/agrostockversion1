@@ -5,6 +5,8 @@ import { collection, addDoc, getDocs, deleteDoc, doc, query, orderBy, getDoc } f
 import { useAuth } from '../context/AuthContext';
 import { MarketplaceService } from '../services/MarketplaceService';
 
+import { CattleService } from '../services/CattleService';
+
 export default function ProductManagement() {
     const { userData } = useAuth();
     const [products, setProducts] = useState([]);
@@ -12,6 +14,7 @@ export default function ProductManagement() {
     const [showModal, setShowModal] = useState(false);
     const [newProduct, setNewProduct] = useState({ name: '', category: 'Milk', price: '', quantity: '', unit: 'Liter', status: 'Active' });
     const [farmName, setFarmName] = useState('');
+    const [farmRisk, setFarmRisk] = useState('Low');
 
     const fetchFarmName = async () => {
         if (!userData?.uid) return;
@@ -23,6 +26,12 @@ export default function ProductManagement() {
         } catch (error) {
             console.error("Error fetching farm name:", error);
         }
+    };
+
+    const checkFarmHealth = async () => {
+        if (!userData?.uid) return;
+        const risk = await CattleService.getFarmRiskLevel(userData.uid);
+        setFarmRisk(risk);
     };
 
     const fetchProducts = async (isSilent = false) => {
@@ -50,6 +59,7 @@ export default function ProductManagement() {
     useEffect(() => {
         fetchProducts();
         fetchFarmName();
+        checkFarmHealth();
 
         // Polling (15s) to catch stock changes from sales
         const interval = setInterval(() => {
@@ -68,7 +78,8 @@ export default function ProductManagement() {
                 price: parseFloat(newProduct.price),
                 quantity: parseFloat(newProduct.quantity),
                 farmerId: userData.uid,
-                farmName: farmName || 'Local Farm'
+                farmName: farmName || 'Local Farm',
+                healthRisk: farmRisk // Auto-tag product with current farm risk
             });
             setShowModal(false);
             setNewProduct({ name: '', category: 'Milk', price: '', quantity: '', unit: 'Liter', status: 'Active' });
@@ -105,6 +116,30 @@ export default function ProductManagement() {
                     Add New Product
                 </button>
             </header>
+
+            {/* Risk Warning Banner */}
+            {farmRisk !== 'Low' && (
+                <div style={{
+                    background: farmRisk === 'High' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                    border: `1px solid ${farmRisk === 'High' ? '#ef4444' : '#f59e0b'}`,
+                    padding: '1rem',
+                    borderRadius: '12px',
+                    marginBottom: '2rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '1rem'
+                }}>
+                    <AlertCircle size={24} color={farmRisk === 'High' ? '#ef4444' : '#f59e0b'} />
+                    <div>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 'bold', color: farmRisk === 'High' ? '#ef4444' : '#f59e0b' }}>
+                            {farmRisk} Health Risk Detected
+                        </h3>
+                        <p style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                            Selected cattle in your herd have flagged health issues. New products will be marked with a health advisory.
+                        </p>
+                    </div>
+                </div>
+            )}
 
             <div className="glass-panel" style={{ overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>

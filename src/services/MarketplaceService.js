@@ -32,14 +32,89 @@ export const MarketplaceService = {
     },
 
     // Order Management
+    // --- INVENTORY LOCKING ENGINE ---
+
+    async lockStock(productId, quantity, userId) {
+        try {
+            await runTransaction(db, async (transaction) => {
+                const productRef = doc(db, PRODUCTS, productId);
+                const productDoc = await transaction.get(productRef);
+
+                if (!productDoc.exists()) throw new Error("Product not found");
+
+                const data = productDoc.data();
+                const currentStock = data.quantity || 0;
+                const currentLocked = data.lockedQuantity || 0;
+                const locks = data.locks || [];
+
+                // Check existing lock for this user to avoid double locking
+                const existingLockIndex = locks.findIndex(l => l.userId === userId);
+                let lockQtyAdjustment = quantity;
+
+                if (existingLockIndex !== -1) {
+                    // Update existing lock
+                    lockQtyAdjustment = quantity - locks[existingLockIndex].quantity;
+                }
+
+                // Check availability
+                if ((currentStock - currentLocked) < lockQtyAdjustment) {
+                    throw new Error("Insufficient stock to lock.");
+                }
+
+                const newLocks = [...locks];
+                if (existingLockIndex !== -1) {
+                    newLocks[existingLockIndex] = { userId, quantity, expiresAt: Date.now() + 10 * 60 * 1000 }; // 10 min lock
+                } else {
+                    newLocks.push({ userId, quantity, expiresAt: Date.now() + 10 * 60 * 1000 });
+                }
+
+                transaction.update(productRef, {
+                    lockedQuantity: currentLocked + lockQtyAdjustment,
+                    locks: newLocks
+                });
+            });
+            return { success: true };
+        } catch (e) {
+            console.error("Lock Stock Failed:", e);
+            throw e;
+        }
+    },
+
+    async unlockStock(productId, userId) {
+        try {
+            await runTransaction(db, async (transaction) => {
+                const productRef = doc(db, PRODUCTS, productId);
+                const productDoc = await transaction.get(productRef);
+
+                if (!productDoc.exists()) return;
+
+                const data = productDoc.data();
+                const locks = data.locks || [];
+                const userLock = locks.find(l => l.userId === userId);
+
+                if (userLock) {
+                    const newLocks = locks.filter(l => l.userId !== userId);
+                    const newLockedQty = Math.max(0, (data.lockedQuantity || 0) - userLock.quantity);
+
+                    transaction.update(productRef, {
+                        locks: newLocks,
+                        lockedQuantity: newLockedQty
+                    });
+                }
+            });
+        } catch (e) {
+            console.error("Unlock Stock Failed:", e);
+        }
+    },
+
     async placeOrderAtomic(orderData) {
-        // Atomic Transaction:
-        // 1. Check Product Stock (Read)
-        // 2. Fetch Farmer Wallet (Read)
-        // 3. Fetch Farmer Profile (Read)
-        // 4. Decrement Stock (Write)
-        // 5. Update/Create Farmer Wallet (Write)
-        // 6. Create Order (Write)
+        // Atomic Transaction with Lock Consumption:
+        // 1. Read Product & Locks
+        // 2. Read Wallet & Farm
+        // 3. Logic: Consume lock if exists, else check free stock
+        // 4. Update Product (Quantity & Locks)
+        // 5. Update Wallet
+        // 6. Create Order
 
         try {
             await runTransaction(db, async (transaction) => {
@@ -63,14 +138,41 @@ export const MarketplaceService = {
 
                 // --- LOGIC & VALIDATION ---
 
-                const currentStock = productDoc.data().quantity;
+                const pData = productDoc.data();
+                const currentStock = pData.quantity;
                 const buyQty = orderData.quantity;
+                const userId = orderData.buyerId;
 
-                if (currentStock < buyQty) {
-                    throw new Error(`Insufficient stock! Only ${currentStock} left.`);
+                // Lock Consumption Logic
+                const locks = pData.locks || [];
+                const userLock = locks.find(l => l.userId === userId);
+
+                // Determine valid stock deduction
+                let newStock = currentStock - buyQty;
+                let newLockedQty = pData.lockedQuantity || 0;
+                let newLocks = [...locks];
+
+                if (userLock) {
+                    // Scenario A: User HAS A LOCK (Expected path)
+                    // We consume their lock.
+                    // The stock was already "reserved" via lockedQuantity, but physically it's still in 'quantity'.
+                    // So we reduce 'quantity' by buyQty.
+                    // And we reduce 'lockedQuantity' by the lock amount (releasing the reservation).
+
+                    newLockedQty = Math.max(0, newLockedQty - userLock.quantity);
+                    newLocks = newLocks.filter(l => l.userId !== userId);
+
+                    // Sanity check: ensure even with lock, physical stock exists (it should)
+                    if (currentStock < buyQty) throw new Error("Critical Stock Error: Lock exists but physical stock missing.");
+
+                } else {
+                    // Scenario B: Direct Buy (No Lock)
+                    // Must check against (Total - Locked)
+                    const freeStock = currentStock - newLockedQty;
+                    if (freeStock < buyQty) {
+                        throw new Error(`Insufficient stock! Available: ${freeStock}`);
+                    }
                 }
-
-                const newStock = currentStock - buyQty;
 
                 // Prepare Farmer Details
                 let farmerDetails = {
@@ -92,42 +194,39 @@ export const MarketplaceService = {
 
                 // --- WRITE OPERATIONS ---
 
-                // 4. Update Product Stock
+                // 4. Update Product Stock & Locks
                 transaction.update(productRef, {
                     quantity: newStock,
+                    lockedQuantity: newLockedQty,
+                    locks: newLocks,
                     status: newStock === 0 ? 'Out of Stock' : 'Active'
                 });
 
-                // 5. Update/Create Wallet
-                if (walletDoc.exists()) {
-                    const newBalance = (walletDoc.data().balance || 0) + orderData.total;
-                    transaction.update(walletRef, {
-                        balance: newBalance,
-                        updatedAt: new Date().toISOString()
-                    });
-                } else {
-                    transaction.set(walletRef, {
-                        farmerId: orderData.farmerId,
-                        balance: orderData.total,
-                        updatedAt: new Date().toISOString()
-                    });
-                }
+                // 5. Update Wallet (Only if NOT Negotiating - Negotiation implies pay later/COD)
+                // If status is 'Negotiating', we don't deduct/add money yet.
+                if (orderData.status !== 'Negotiating' && orderData.paymentMethod !== 'COD') {
+                    const sellerWalletRef = doc(db, 'wallets', orderData.farmerId);
+                    const sellerWallet = await transaction.get(sellerWalletRef);
 
-                // 6. Create Order
-                const newOrderRef = doc(collection(db, ORDERS));
-                transaction.set(newOrderRef, {
+                    if (sellerWallet.exists()) {
+                        transaction.update(sellerWalletRef, {
+                            balance: (sellerWallet.data().balance || 0) + orderData.total,
+                            updatedAt: new Date().toISOString()
+                        });
+                    } else {
+                        transaction.set(sellerWalletRef, {
+                            farmerId: orderData.farmerId,
+                            balance: orderData.total,
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                }
+                // 6. Create Order (This should be done regardless of payment method)
+                const orderRef = collection(db, 'orders');
+                transaction.set(doc(orderRef), {
                     ...orderData,
-                    shopName: orderData.shopName || 'Local Farm',
-                    // Farmer/Seller Details
-                    farmerName: farmerDetails.farmerName,
-                    farmerPhone: farmerDetails.farmerPhone,
-                    farmerLocation: farmerDetails.farmerLocation,
-                    // Buyer Details (passed from frontend)
-                    buyerLocation: orderData.buyerLocation || '',
-                    buyerPhone: orderData.buyerPhone || '',
-                    status: 'Pending',
-                    timestamp: new Date().toISOString(),
-                    transactionId: newOrderRef.id // Store ID inside
+                    farmerDetails,
+                    timestamp: new Date().toISOString()
                 });
             });
             return { success: true };
@@ -158,8 +257,21 @@ export const MarketplaceService = {
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
     },
 
+    // 🔹 Update Order Status (For Farmer Acceptance)
     async updateOrderStatus(orderId, status) {
-        await updateDoc(doc(db, ORDERS, orderId), { status });
+        try {
+            const orderRef = doc(db, 'orders', orderId);
+            const updateData = { status };
+
+            if (status === 'Accepted') updateData.acceptedAt = new Date().toISOString();
+            if (status === 'Rejected') updateData.rejectedAt = new Date().toISOString();
+            if (status === 'Delivered') updateData.deliveredAt = new Date().toISOString();
+
+            await updateDoc(orderRef, updateData);
+        } catch (error) {
+            console.error("Error updating status:", error);
+            throw error;
+        }
     },
 
     async updateFarmerWallet(farmerId, amount) {

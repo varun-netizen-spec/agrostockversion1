@@ -10,13 +10,13 @@ import {
     BarChart as BarChartIcon, LineChart as LineChartIcon, PieChart as PieChartIcon
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import AIInsightsPanel from '../components/AIInsightsPanel';
+import NotificationsPanel from '../components/NotificationsPanel';
 
 
 export default function Dashboard() {
     const { userData } = useAuth();
-
     const [farmData, setFarmData] = useState(null);
     const [stats, setStats] = useState({
         totalCattle: 0,
@@ -29,20 +29,16 @@ export default function Dashboard() {
         monthlyExpenses: 0,
         netProfit: 0
     });
-    const [yieldTrend, setYieldTrend] = useState([]);
-    const [recentActivities, setRecentActivities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [liveWalletBalance, setLiveWalletBalance] = useState(0);
     const [marketplaceStats, setMarketplaceStats] = useState({ activeListings: 0, totalOrders: 0 });
     const [vetActivity, setVetActivity] = useState([]);
     const [sharedReports, setSharedReports] = useState([]);
+    const [recentActivities, setRecentActivities] = useState([]);
 
     useEffect(() => {
         if (userData?.uid) {
             fetchDashboardStats();
-
-            // Smart Polling (10s) for critical "Real-time" feel (Wallet/Orders)
-            // Stays free on Spark Plan while feeling live like Swiggy
             const interval = setInterval(() => {
                 if (!document.hidden) {
                     fetchLiveUpdates();
@@ -55,14 +51,11 @@ export default function Dashboard() {
     const fetchLiveUpdates = async () => {
         if (!userData?.uid) return;
         try {
-            // 1. Get Real-time Wallet Balance
             const walletDoc = await getDoc(doc(db, 'wallets', userData.uid));
             if (walletDoc.exists()) {
                 const newBalance = walletDoc.data().balance || 0;
                 setLiveWalletBalance(prev => prev !== newBalance ? newBalance : prev);
             }
-
-            // 2. Sync Marketplace Stats (Orders count)
             const products = await MarketplaceService.getFarmerProducts(userData.uid);
             const orders = await MarketplaceService.getFarmerOrders(userData.uid);
 
@@ -78,25 +71,17 @@ export default function Dashboard() {
     async function fetchDashboardStats() {
         try {
             setLoading(true);
-
-            // 1. Fetch Farm/Farmer Info (needed for some logic even for admins)
             const farmDoc = await getDoc(doc(db, 'farms', userData.uid));
             const currentFarmData = farmDoc.exists() ? farmDoc.data() : null;
             if (currentFarmData) setFarmData(currentFarmData);
 
-            // 2. Identify Role (Check both auth data and farm data for safety)
             const resolvedRole = (userData?.role || currentFarmData?.role || 'farmer').toLowerCase();
             const isAdmin = resolvedRole === 'admin';
             const isBuyer = resolvedRole === 'buyer';
             const isVet = resolvedRole === 'vet';
             const ownerId = isAdmin ? null : userData.uid;
 
-            console.log(`[Dashboard] View Mode: ${isAdmin ? 'GLOBAL ADMIN' : (isBuyer ? 'BUYER' : (isVet ? 'VET' : 'FARMER'))}, OwnerID: ${ownerId}`);
-
-            // 3. Fetch Cattle stats (skip for buyers and vets)
             const cattleData = (isBuyer || isVet) ? [] : await CattleService.getAllCattle(ownerId);
-            console.log(`[Dashboard] Fetched ${cattleData.length} cattle records.`);
-
             const allHealthRecords = [];
             for (const animal of cattleData) {
                 const recs = await CattleService.getHealthRecords(animal.id);
@@ -107,10 +92,6 @@ export default function Dashboard() {
             const healthyCount = cattleData.length - alerts;
             const dueVac = allHealthRecords.filter(r => r.type === 'Vaccination' && r.status === 'Scheduled').length;
 
-            setYieldTrend([]);
-
-
-            // 6. Marketplace Stats
             let products, orders;
             if (isAdmin) {
                 products = await MarketplaceService.getAllProducts();
@@ -137,7 +118,6 @@ export default function Dashboard() {
                 netProfit: 0
             });
 
-            // 7. Vet Activity (Farmer Side only)
             if (!isAdmin && !isBuyer && !isVet) {
                 const recentScans = [];
                 for (const animal of cattleData) {
@@ -148,35 +128,27 @@ export default function Dashboard() {
                 setVetActivity(vetted);
             }
 
-            // 8. Fetch Shared Reports for Vets
             if (isVet) {
                 const reports = await CattleService.getSharedReportsForVet(userData.uid);
                 setSharedReports(reports);
             }
-
             setRecentActivities([]);
-
-
 
         } catch (err) {
             console.error("Dashboard error:", err);
-            // Alert user if permission error
-            if (err.message?.includes('permission')) {
-                console.warn("ALERT: Admin role detected but Firestore Rules are blocking global access.");
-            }
         } finally {
             setLoading(false);
         }
     }
-
-
 
     const isBuyer = userData?.role?.toLowerCase() === 'buyer';
     const isVet = userData?.role?.toLowerCase() === 'vet';
 
     return (
         <div style={{ paddingBottom: '3rem' }}>
+            {/* ... Header ... */}
             <header style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                {/* ... (keep header content) ... */}
                 <div>
                     <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>
                         {isBuyer ? 'Marketplace Dashboard' : (isVet ? 'Veterinarian Dashboard' : `Welcome back, ${userData?.farmName || userData?.displayName || 'User'} 👋`)}
@@ -200,6 +172,16 @@ export default function Dashboard() {
                     </button>
                 )}
             </header>
+
+            {/* 🔹 0. Smart Notifications (All Users) */}
+            <NotificationsPanel userData={{ ...userData, role: isBuyer ? 'buyer' : isVet ? 'vet' : 'farmer' }} />
+
+            {/* 🔹 1. AI Insights Panel (Farmers only) */}
+            {!isBuyer && !isVet && (
+                <div style={{ marginBottom: '2rem' }}>
+                    <AIInsightsPanel farmerId={userData?.uid} />
+                </div>
+            )}
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2rem' }}>
 

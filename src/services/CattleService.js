@@ -208,5 +208,52 @@ export const CattleService = {
             status: 'Reviewed',
             updatedAt: new Date().toISOString()
         });
+    },
+
+    // 🔹 Bio-Security & Market Safety
+    async getFarmRiskLevel(ownerId) {
+        try {
+            // 1. Get all cattle
+            const cattle = await this.getAllCattle(ownerId);
+            if (cattle.length === 0) return 'Low';
+
+            // 2. Check for contagious diseases in recent records
+            // For MVP performance, we limit to checking last 20 animals or use a specialized query if optimized
+            const recentCattle = cattle.slice(0, 20);
+
+            let highRiskFound = false;
+            let mediumRiskFound = false;
+
+            const highRiskDiseases = ['Lumpy Skin', 'Foot & Mouth', 'Anthrax', 'Brucellosis'];
+            const mediumRiskDiseases = ['Mastitis', 'Fever', 'Unknown Infection'];
+
+            for (const cow of recentCattle) {
+                // Check recent scans (e.g., last 14 days)
+                const scans = await this.getScanHistory(cow.id);
+                const recentScans = scans.filter(s => {
+                    const diffTime = Math.abs(new Date() - new Date(s.timestamp));
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays <= 14;
+                });
+
+                for (const scan of recentScans) {
+                    if (scan.predictions?.some(p => highRiskDiseases.includes(p.class))) {
+                        highRiskFound = true;
+                        break;
+                    }
+                    if (scan.predictions?.some(p => mediumRiskDiseases.includes(p.class) || scan.healthScore < 50)) {
+                        mediumRiskFound = true;
+                    }
+                }
+                if (highRiskFound) break; // Exit early if critical
+            }
+
+            if (highRiskFound) return 'High';
+            if (mediumRiskFound) return 'Medium';
+            return 'Low';
+        } catch (error) {
+            console.error("Risk Assessment Error:", error);
+            return 'Low'; // Default to allow trade but log error
+        }
     }
 };

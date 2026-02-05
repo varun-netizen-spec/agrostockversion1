@@ -61,5 +61,47 @@ export const GeminiService = {
             console.error("Gemini AI Simple Error:", error);
             return "Unable to generate explanation.";
         }
+    },
+
+    async generateBusinessInsights(salesData) {
+        if (!genAI) return "AI Insights Unavailable (Key Missing)";
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const prompt = `
+                You are a Business Intelligence Analyst for a dairy farm. Analyze the following sales data JSON:
+                ${JSON.stringify(salesData)}
+
+                Identify 3 key insights:
+                1. Best performing products.
+                2. Peak sales times (morning/evening).
+                3. Actionable advice to increase profit (e.g., "Stock more Paneer for Friday evenings").
+
+                Format the output as a clean JSON object with this structure (no markdown):
+                {
+                    "insights": [
+                        { "title": "Insight Title", "description": "Short explanation", "type": "positive/warning/tip" }
+                    ],
+                    "recommendation": "One main actionable advice sentence."
+                }
+            `;
+
+            const result = await model.generateContent(prompt);
+            const response = await result.response;
+            let text = response.text();
+
+            // Clean markdown code blocks if present
+            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+
+            return JSON.parse(text);
+        } catch (error) {
+            console.error("Gemini Business Insight Error:", error);
+            // Fallback mock data if AI fails
+            return {
+                insights: [
+                    { title: "Data Analysis Failed", description: "Could not generate live insights.", type: "warning" }
+                ],
+                recommendation: "Check your sales reports manually."
+            };
+        }
     }
 };

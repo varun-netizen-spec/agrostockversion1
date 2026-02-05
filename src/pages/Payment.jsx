@@ -19,6 +19,7 @@ export default function Payment() {
     const [transactionId, setTransactionId] = useState(null);
     const [paymentMethod, setPaymentMethod] = useState('UPI');
     const [invoiceDate, setInvoiceDate] = useState(null);
+    const [offerPrice, setOfferPrice] = useState('');
 
     // Buyer Information
     const [buyerInfo, setBuyerInfo] = useState({
@@ -39,6 +40,51 @@ export default function Payment() {
         );
     }
 
+    // --- INVENTORY LOCKING ---
+    const [locking, setLocking] = useState(true);
+    const lockedItemsRef = React.useRef([]);
+
+    React.useEffect(() => {
+        const lockInventory = async () => {
+            try {
+                const promises = cartItems.map(item =>
+                    MarketplaceService.lockStock(item.id, item.qty, userData.uid)
+                );
+                await Promise.all(promises);
+                lockedItemsRef.current = cartItems; // Track successfully locked items
+                setLocking(false);
+            } catch (error) {
+                console.error("Locking Error:", error);
+                alert("Some items are no longer available. Returning to marketplace.");
+                navigate('/marketplace');
+            }
+        };
+
+        if (userData?.uid) {
+            lockInventory();
+        }
+
+        return () => {
+            // Cleanup: Unlock stock when leaving (if not purchased)
+            // Note: If purchase was successful, placeOrderAtomic already consumed the lock,
+            // so unlockStock will simply find nothing and do nothing. Safe.
+            if (lockedItemsRef.current.length > 0) {
+                lockedItemsRef.current.forEach(item => {
+                    MarketplaceService.unlockStock(item.id, userData.uid);
+                });
+            }
+        };
+    }, []);
+
+    if (locking) {
+        return (
+            <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <Loader2 className="animate-spin" size={48} color="var(--accent-primary)" />
+                <p style={{ marginTop: '1rem', color: 'var(--text-muted)' }}>Securing your items...</p>
+            </div>
+        );
+    }
+
     const handlePay = async () => {
         setProcessing(true);
 
@@ -51,7 +97,24 @@ export default function Payment() {
             const date = new Date().toLocaleString();
             setInvoiceDate(date);
 
+            // Logic for Offer/Negotiation
+            const isNegotiating = offerPrice && parseFloat(offerPrice) < totalAmount;
+            const finalTotal = isNegotiating ? parseFloat(offerPrice) : totalAmount;
+
+            // Distribute offer price proportionally if multiple items (Simplified: mostly single item orders expected for negotiation, but let's handle proportional)
+            // Actually, negotiation usually happens on the total. We need to split it per item?
+            // "Farmers sell independently". CartItems might be from DIFFERENT farmers. 
+            // !! Negotiation assumes 1 farmer or we negotiate with EACH? 
+            // The prompt says "Multiple farmers sell independently". 
+            // If checking out cart with multiple farmers, negotiation is messy.
+            // Assumption: User negotiates on the TOTAL bill. We will split the discount proportionally.
+
+            const discountRatio = isNegotiating ? (parseFloat(offerPrice) / totalAmount) : 1;
+
             for (const item of cartItems) {
+                const itemTotal = item.qty * item.price;
+                const negotiatedItemTotal = Math.floor(itemTotal * discountRatio);
+
                 try {
                     await MarketplaceService.placeOrderAtomic({
                         buyerId: userData.uid,
@@ -64,10 +127,11 @@ export default function Payment() {
                         productName: item.name,
                         quantity: item.qty,
                         price: item.price,
-                        total: item.qty * item.price,
+                        total: negotiatedItemTotal, // The price this farmer gets (if accepted)
+                        originalTotal: itemTotal,   // Reference
                         paymentId: tId,
-                        paymentMethod: paymentMethod,
-                        status: 'Paid'
+                        paymentMethod: isNegotiating ? 'COD' : paymentMethod,
+                        status: isNegotiating ? 'Negotiating' : 'Placed' // Status change
                     });
                 } catch (err) {
                     console.error(`Failed to place order for ${item.name}:`, err);
@@ -376,8 +440,29 @@ export default function Payment() {
                         Select Payment Method
                     </h2>
 
+                    {/* Negotiation Input */}
+                    <div style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', borderRadius: '12px', border: '1px solid #38bdf8' }}>
+                        <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '600', color: '#38bdf8' }}>Negotiate Price (Optional)</label>
+                        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                            <input
+                                type="number"
+                                className="input-field"
+                                style={{ marginBottom: 0 }}
+                                placeholder={`Offer less than ₹${totalAmount}`}
+                                value={offerPrice}
+                                onChange={(e) => setOfferPrice(e.target.value)}
+                            />
+                            {offerPrice && <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>Original: ₹{totalAmount}</span>}
+                        </div>
+                        {offerPrice && (
+                            <div style={{ fontSize: '0.8rem', marginTop: '0.5rem', color: 'var(--text-dim)' }}>
+                                * If you negotiate, payment will be "Pay on Delivery" after farmer approval.
+                            </div>
+                        )}
+                    </div>
+
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                        {['UPI', 'Card', 'COD'].map((method) => (
+                        {!offerPrice && ['UPI', 'Card', 'COD'].map((method) => (
                             <label key={method} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1rem', border: `1px solid ${paymentMethod === method ? 'var(--accent-primary)' : 'var(--border-color)'}`, borderRadius: '12px', cursor: 'pointer', background: paymentMethod === method ? 'var(--accent-glow)' : 'transparent', transition: 'all 0.2s' }}>
                                 <div style={{
                                     width: '20px', height: '20px', borderRadius: '50%', border: '2px solid var(--border-color)',
@@ -393,6 +478,15 @@ export default function Payment() {
                                 </div>
                             </label>
                         ))}
+                        {offerPrice && (
+                            <div style={{ padding: '1rem', border: '1px solid #38bdf8', borderRadius: '12px', background: 'rgba(56, 189, 248, 0.05)', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                                <ShieldCheck size={20} color="#38bdf8" />
+                                <div>
+                                    <div style={{ fontWeight: '600', color: '#38bdf8' }}>Negotiation Mode</div>
+                                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Payment will be handled after acceptance.</div>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </section>
 
