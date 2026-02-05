@@ -113,11 +113,13 @@ export default function Register() {
                             }} />
                             <select
                                 className="input-field"
-                                style={{ paddingLeft: '3rem', appearance: 'none' }}
+                                style={{ paddingLeft: '3rem', appearance: 'none', color: 'var(--text-primary)' }}
                                 value={role}
                                 onChange={(e) => setRole(e.target.value)}
                             >
                                 <option value="farmer">Farmer</option>
+                                <option value="buyer">Shop Owner (Buyer)</option>
+                                <option value="vet">Veterinarian</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>

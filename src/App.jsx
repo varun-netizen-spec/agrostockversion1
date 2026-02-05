@@ -7,8 +7,13 @@ import Dashboard from './pages/Dashboard';
 import Sidebar from './components/Sidebar';
 import FarmProfile from './pages/FarmProfile';
 import CattleList from './pages/CattleList';
-import FeedOptimizer from './pages/FeedOptimizer';
 import HealthRecords from './pages/HealthRecords';
+import Marketplace from './pages/Marketplace';
+import ProductManagement from './pages/ProductManagement';
+import Orders from './pages/Orders';
+import CattleHealthScanner from './pages/CattleHealthScanner';
+import Payment from './pages/Payment';
+import VetDashboard from './pages/VetDashboard';
 
 // Protected Layout Component
 function ProtectedLayout({ children }) {
@@ -28,10 +33,12 @@ function ProtectedLayout({ children }) {
     );
 }
 
+
+
 function App() {
     return (
         <AuthProvider>
-            <Router>
+            <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
@@ -40,7 +47,12 @@ function App() {
                     <Route path="/farm-profile" element={<ProtectedLayout><FarmProfile /></ProtectedLayout>} />
                     <Route path="/cattle" element={<ProtectedLayout><CattleList /></ProtectedLayout>} />
                     <Route path="/health" element={<ProtectedLayout><HealthRecords /></ProtectedLayout>} />
-                    <Route path="/feed" element={<ProtectedLayout><FeedOptimizer /></ProtectedLayout>} />
+                    <Route path="/marketplace" element={<ProtectedLayout><Marketplace /></ProtectedLayout>} />
+                    <Route path="/inventory" element={<ProtectedLayout><ProductManagement /></ProtectedLayout>} />
+                    <Route path="/orders" element={<ProtectedLayout><Orders /></ProtectedLayout>} />
+                    <Route path="/payment" element={<ProtectedLayout><Payment /></ProtectedLayout>} />
+                    <Route path="/scan" element={<ProtectedLayout><CattleHealthScanner /></ProtectedLayout>} />
+                    <Route path="/vet-portal" element={<ProtectedLayout><VetDashboard /></ProtectedLayout>} />
                 </Routes>
             </Router>
         </AuthProvider>

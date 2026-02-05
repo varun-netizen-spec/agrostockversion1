@@ -44,6 +44,13 @@ export function AuthProvider({ children }) {
         return signOut(auth);
     }
 
+    async function updateUserRole(newRole) {
+        if (!currentUser) return;
+        const roleLower = newRole.toLowerCase();
+        await setDoc(doc(db, 'users', currentUser.uid), { role: roleLower }, { merge: true });
+        setUserData(prev => ({ ...prev, role: roleLower }));
+    }
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (user) => {
             setCurrentUser(user);
@@ -66,7 +73,8 @@ export function AuthProvider({ children }) {
         userData,
         signup,
         login,
-        logout
+        logout,
+        updateUserRole
     };
 
     return (
