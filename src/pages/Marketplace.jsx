@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ShoppingCart, Search, Filter, Star, Clock, MapPin, Plus, Minus, CheckCircle, Zap, Repeat } from 'lucide-react';
+import { ShoppingCart, Search, Filter, Star, Clock, MapPin, Plus, Minus, CheckCircle, Zap, Repeat, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { MarketplaceService } from '../services/MarketplaceService';
+import TraceabilityBadge from '../components/TraceabilityBadge';
 
 export default function Marketplace() {
     const { userData } = useAuth();
@@ -235,7 +236,10 @@ export default function Marketplace() {
                                         </div>
                                     )}
 
-                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                                    {/* Traceability Badge */}
+                                    <TraceabilityBadge product={product} />
+
+                                    <div style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.5rem' }}>
                                         <MapPin size={14} />
                                         {product.category} Section
                                     </div>

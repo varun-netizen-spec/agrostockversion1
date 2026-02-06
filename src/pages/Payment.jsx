@@ -43,16 +43,20 @@ export default function Payment() {
     // --- INVENTORY LOCKING ---
     const [locking, setLocking] = useState(true);
     const lockedItemsRef = React.useRef([]);
+    const hasLockedRef = React.useRef(false);
 
     React.useEffect(() => {
         const lockInventory = async () => {
+            if (hasLockedRef.current) return;
+            hasLockedRef.current = true;
+
             try {
                 const promises = cartItems.map(item =>
                     MarketplaceService.lockStock(item.id, item.qty, userData.uid)
                 );
                 await Promise.all(promises);
                 lockedItemsRef.current = cartItems; // Track successfully locked items
-                setLocking(false);
+                if (mountedRef.current) setLocking(false);
             } catch (error) {
                 console.error("Locking Error:", error);
                 alert("Some items are no longer available. Returning to marketplace.");
@@ -60,14 +64,17 @@ export default function Payment() {
             }
         };
 
+        let mounted = true;
+        const mountedRef = { current: true };
+
         if (userData?.uid) {
             lockInventory();
         }
 
         return () => {
+            mounted = false;
+            mountedRef.current = false;
             // Cleanup: Unlock stock when leaving (if not purchased)
-            // Note: If purchase was successful, placeOrderAtomic already consumed the lock,
-            // so unlockStock will simply find nothing and do nothing. Safe.
             if (lockedItemsRef.current.length > 0) {
                 lockedItemsRef.current.forEach(item => {
                     MarketplaceService.unlockStock(item.id, userData.uid);

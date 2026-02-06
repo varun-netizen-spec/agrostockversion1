@@ -1,316 +1,231 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { CattleService } from '../services/CattleService';
+import { VetCaseService } from '../services/VetCaseService';
 import {
-    Stethoscope,
-    FileText,
-    AlertTriangle,
-    CheckCircle2,
-    Clock,
-    ChevronRight,
-    MessageSquare,
-    Save,
-    Search,
-    User,
-    Activity,
-    Shield
+    Activity, AlertTriangle, Clipboard, CheckCircle, Clock,
+    Stethoscope, FileText, ChevronRight, Save, User
 } from 'lucide-react';
+import { db } from '../firebase/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function VetDashboard() {
     const { userData } = useAuth();
-    const [sharedReports, setSharedReports] = useState([]);
+    const [cases, setCases] = useState([]);
+    const [selectedCase, setSelectedCase] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [selectedReport, setSelectedReport] = useState(null);
-    const [feedback, setFeedback] = useState({
-        note: '',
-        urgency: 'Medium',
-        treatment: ''
-    });
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
 
     useEffect(() => {
         if (userData?.uid) {
-            fetchSharedReports();
+            loadCases();
         }
     }, [userData]);
 
-    const fetchSharedReports = async () => {
-        try {
-            setLoading(true);
-            const reports = await CattleService.getSharedReportsForVet(userData.uid);
-            setSharedReports(reports);
-        } catch (err) {
-            console.error("Error fetching shared reports:", err);
-        } finally {
-            setLoading(false);
-        }
+    const loadCases = async () => {
+        setLoading(true);
+        const data = await VetCaseService.getAssignedCases(userData.uid);
+        //Sort logic: Critical first, then by date
+        const sorted = data.sort((a, b) => {
+            const severityWeight = { 'Critical': 3, 'Medium': 2, 'Low': 1 };
+            const wA = severityWeight[a.severity] || 0;
+            const wB = severityWeight[b.severity] || 0;
+            return wB - wA; // Descending severity
+        });
+        setCases(sorted);
+        setLoading(false);
     };
 
-    const handleFeedbackSubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedReport || !feedback.note) return;
-
-        setIsSubmitting(true);
-        try {
-            await CattleService.submitVetFeedback(
-                selectedReport.reportId,
-                selectedReport.id,
-                {
-                    vetId: userData.uid,
-                    vetName: userData.email.split('@')[0], // Simplified name for demo
-                    note: feedback.note,
-                    urgency: feedback.urgency,
-                    treatment: feedback.treatment
-                }
-            );
-
-            setSuccessMessage("Feedback submitted successfully!");
-            setTimeout(() => setSuccessMessage(''), 3000);
-
-            // Refresh the list and close details
-            await fetchSharedReports();
-            setSelectedReport(null);
-            setFeedback({ note: '', urgency: 'Medium', treatment: '' });
-        } catch (err) {
-            console.error("Error submitting feedback:", err);
-        } finally {
-            setIsSubmitting(false);
-        }
+    const handleUpdateStatus = async (status) => {
+        if (!selectedCase) return;
+        await VetCaseService.updateCaseStatus(selectedCase.id, status, selectedCase.severity);
+        setSelectedCase(prev => ({ ...prev, status }));
+        loadCases(); // Refresh list
     };
 
-    if (loading) {
-        return (
-            <div className="page-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-                <Activity className="animate-spin" size={48} color="var(--accent-primary)" />
-            </div>
-        );
-    }
+    const criticalCases = cases.filter(c => c.severity === 'Critical' && c.status !== 'Resolved');
 
     return (
-        <div className="page-container">
-            <header className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-                <div>
-                    <h1 className="page-title">Veterinarian Portal</h1>
-                    <p className="page-subtitle">Expert consultation for AgroStock cattle health</p>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', background: 'var(--bg-secondary)', padding: '0.75rem 1.5rem', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                    <Stethoscope size={24} color="var(--accent-primary)" />
-                    <div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Registered Veterinarian</div>
-                        <div style={{ fontSize: '0.9rem', fontWeight: 'bold' }}>{userData?.email}</div>
-                    </div>
-                </div>
-            </header>
+        <div style={{ maxWidth: '1400px', margin: '0 auto', display: 'grid', gridTemplateColumns: '350px 1fr', gap: '2rem', height: 'calc(100vh - 100px)' }}>
 
-            <div style={{ display: 'grid', gridTemplateColumns: selectedReport ? '1fr 1.5fr' : '1fr', gap: '2rem' }}>
-                {/* 🔹 Shared Reports List */}
-                <div className="glass-panel" style={{ padding: '1.5rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                        <h3 style={{ fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                            <Clock size={20} color="var(--accent-primary)" />
-                            Pending Consultations
+            {/* LEFT COLUMN: Case List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', overflowY: 'auto', paddingRight: '0.5rem' }}>
+                <div style={{ marginBottom: '1rem' }}>
+                    <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>My Cases</h1>
+                    <p style={{ color: 'var(--text-muted)' }}>{cases.length} active records</p>
+                </div>
+
+                {/* Emergency Queue */}
+                {criticalCases.length > 0 && (
+                    <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+                        <h3 style={{ color: '#ef4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem', fontWeight: '700', marginBottom: '0.75rem' }}>
+                            <AlertTriangle size={16} /> EMERGENCY QUEUE
                         </h3>
-                        <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Total: {sharedReports.length}</span>
-                    </div>
-
-                    {sharedReports.length === 0 ? (
-                        <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-dim)' }}>
-                            <Shield size={48} style={{ opacity: 0.2, marginBottom: '1rem' }} />
-                            <p>No reports shared for review at this time.</p>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                            {sharedReports.map(item => (
-                                <div
-                                    key={item.id}
-                                    onClick={() => setSelectedReport(item)}
-                                    className="glass-panel"
-                                    style={{
-                                        padding: '1rem',
-                                        cursor: 'pointer',
-                                        transition: 'all 0.2s ease',
-                                        border: selectedReport?.id === item.id ? '1px solid var(--accent-primary)' : '1px solid transparent',
-                                        background: selectedReport?.id === item.id ? 'rgba(74, 222, 128, 0.05)' : 'rgba(255,255,255,0.02)',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between'
-                                    }}
-                                >
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                        <div style={{
-                                            width: '40px',
-                                            height: '40px',
-                                            borderRadius: '8px',
-                                            background: item.reportDetails.severity === 'Red' ? 'rgba(239, 68, 68, 0.1)' : (item.reportDetails.severity === 'Yellow' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(16, 185, 129, 0.1)'),
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            color: item.reportDetails.severity === 'Red' ? '#ef4444' : (item.reportDetails.severity === 'Yellow' ? '#f59e0b' : '#10b981')
-                                        }}>
-                                            <Activity size={20} />
-                                        </div>
-                                        <div>
-                                            <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>Tag: {item.reportDetails.tagId}</div>
-                                            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{new Date(item.timestamp).toLocaleDateString()} • {item.reportDetails.condition}</div>
-                                        </div>
-                                    </div>
-                                    <div style={{ textAlign: 'right' }}>
-                                        <div style={{
-                                            padding: '0.2rem 0.5rem',
-                                            borderRadius: '4px',
-                                            fontSize: '0.65rem',
-                                            fontWeight: 'bold',
-                                            background: item.status === 'Reviewed' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
-                                            color: item.status === 'Reviewed' ? '#10b981' : '#f59e0b'
-                                        }}>
-                                            {item.status.toUpperCase()}
-                                        </div>
-                                        <ChevronRight size={16} color="var(--text-dim)" style={{ marginTop: '0.25rem' }} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-
-                {/* 🔹 Consultation Details & Feedback Form */}
-                {selectedReport && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '2rem' }}>
-                        <div className="glass-panel" style={{ padding: '2rem', borderTop: `4px solid ${selectedReport.reportDetails.severity === 'Red' ? '#ef4444' : (selectedReport.reportDetails.severity === 'Yellow' ? '#f59e0b' : '#10b981')}` }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-                                <div>
-                                    <h2 style={{ fontSize: '1.5rem', marginBottom: '0.25rem' }}>Review Health Report</h2>
-                                    <p style={{ color: 'var(--text-dim)', fontSize: '0.875rem' }}>Source: AI Intelligence Scan • {selectedReport.reportDetails.timestamp.slice(0, 10)}</p>
-                                </div>
-                                <div style={{ textAlign: 'right' }}>
-                                    <div style={{ fontSize: '1.25rem', fontWeight: 'bold' }}>Health Score: {selectedReport.reportDetails.healthScore}%</div>
-                                    <div style={{ fontSize: '0.875rem', color: selectedReport.reportDetails.severity === 'Red' ? '#ef4444' : (selectedReport.reportDetails.severity === 'Yellow' ? '#f59e0b' : '#10b981') }}>Condition: {selectedReport.reportDetails.condition}</div>
-                                </div>
+                        {criticalCases.map(c => (
+                            <div
+                                key={c.id}
+                                onClick={() => setSelectedCase(c)}
+                                style={{
+                                    background: 'white', padding: '0.75rem', borderRadius: '8px', marginBottom: '0.5rem', cursor: 'pointer',
+                                    border: selectedCase?.id === c.id ? '2px solid #ef4444' : '1px solid #fee2e2'
+                                }}
+                            >
+                                <div style={{ fontWeight: '600', fontSize: '0.95rem' }}>{c.cattleId || 'Unknown Cattle'}</div>
+                                <div style={{ fontSize: '0.85rem', color: '#ef4444' }}>High Fever / Critical</div>
                             </div>
-
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
-                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>CATTLE INFORMATION</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Tag ID:</span>
-                                            <span style={{ fontWeight: 'bold' }}>{selectedReport.reportDetails.tagId}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Breed:</span>
-                                            <span style={{ fontWeight: 'bold' }}>{selectedReport.reportDetails.breed}</span>
-                                        </div>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <span>Age:</span>
-                                            <span style={{ fontWeight: 'bold' }}>{selectedReport.reportDetails.age}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style={{ background: 'rgba(255,255,255,0.02)', padding: '1rem', borderRadius: '8px' }}>
-                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>AI DETECTION RESULTS</div>
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                                        {Object.entries(selectedReport.reportDetails.risks).map(([name, risk]) => (
-                                            <div key={name} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <span>{name}:</span>
-                                                <span style={{ fontWeight: 'bold', color: risk > 50 ? '#ef4444' : 'inherit' }}>{risk}%</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div style={{ padding: '1.5rem', background: 'rgba(56, 189, 248, 0.05)', borderRadius: '12px', borderLeft: '4px solid var(--accent-primary)', marginBottom: '2rem' }}>
-                                <h4 style={{ fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <Shield size={16} /> AI Explanation
-                                </h4>
-                                <p style={{ fontSize: '1rem', lineHeight: '1.6', fontStyle: 'italic', color: 'var(--text-main)' }}>
-                                    "{selectedReport.reportDetails.explanation.en}"
-                                </p>
-                            </div>
-
-                            <form onSubmit={handleFeedbackSubmit}>
-                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                    <MessageSquare size={20} color="var(--accent-primary)" />
-                                    Professional Feedback
-                                </h3>
-
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-                                    <div className="input-group">
-                                        <label className="input-label">Urgency Level</label>
-                                        <select
-                                            className="input-field"
-                                            value={feedback.urgency}
-                                            onChange={(e) => setFeedback({ ...feedback, urgency: e.target.value })}
-                                        >
-                                            <option value="Low">Low - Normal monitoring</option>
-                                            <option value="Medium">Medium - Follow-up needed</option>
-                                            <option value="High">High - Urgent visit required</option>
-                                        </select>
-                                    </div>
-                                    <div className="input-group">
-                                        <label className="input-label">Treatment Suggestion</label>
-                                        <input
-                                            type="text"
-                                            className="input-field"
-                                            placeholder="e.g. Paracetamol, Isolation"
-                                            value={feedback.treatment}
-                                            onChange={(e) => setFeedback({ ...feedback, treatment: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="input-group">
-                                    <label className="input-label">Clinical Notes</label>
-                                    <textarea
-                                        className="input-field"
-                                        rows="4"
-                                        placeholder="Add your professional observations and advice for the farmer..."
-                                        required
-                                        value={feedback.note}
-                                        onChange={(e) => setFeedback({ ...feedback, note: e.target.value })}
-                                        style={{ resize: 'none' }}
-                                    ></textarea>
-                                </div>
-
-                                {successMessage && (
-                                    <div style={{
-                                        padding: '1rem',
-                                        background: 'rgba(16, 185, 129, 0.1)',
-                                        color: '#10b981',
-                                        borderRadius: '8px',
-                                        marginBottom: '1.5rem',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '0.5rem'
-                                    }}>
-                                        <CheckCircle2 size={18} />
-                                        {successMessage}
-                                    </div>
-                                )}
-
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <button
-                                        type="submit"
-                                        className="btn-primary"
-                                        disabled={isSubmitting}
-                                        style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-                                    >
-                                        {isSubmitting ? 'Submitting...' : <><Save size={18} /> Submit Consultation</>}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="glass-panel"
-                                        onClick={() => setSelectedReport(null)}
-                                        style={{ padding: '0 2rem', color: 'var(--text-dim)' }}
-                                    >
-                                        Cancel
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        ))}
                     </div>
                 )}
+
+                {/* All Cases List */}
+                {cases.filter(c => c.severity !== 'Critical' || c.status === 'Resolved').map(c => (
+                    <div
+                        key={c.id}
+                        onClick={() => setSelectedCase(c)}
+                        className="glass-panel"
+                        style={{
+                            padding: '1rem', cursor: 'pointer',
+                            borderLeft: selectedCase?.id === c.id ? '4px solid var(--accent-primary)' : 'none',
+                            background: selectedCase?.id === c.id ? 'var(--bg-secondary)' : 'var(--bg-primary)'
+                        }}
+                    >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                            <span style={{ fontWeight: '600' }}>{c.cattleId || 'Cattle #N/A'}</span>
+                            <span style={{ fontSize: '0.8rem', padding: '0.1rem 0.4rem', borderRadius: '4px', background: c.status === 'Resolved' ? '#dcfce7' : '#fef9c3', color: c.status === 'Resolved' ? '#166534' : '#854d0e' }}>
+                                {c.status || 'Pending'}
+                            </span>
+                        </div>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            {c.farmName || 'Unknown Farm'}
+                        </div>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                            <Clock size={12} /> {c.timestamp ? new Date(c.timestamp).toLocaleDateString() : 'Recent'}
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            {/* RIGHT COLUMN: Case Detail & Workspace */}
+            <div className="glass-panel" style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
+                {selectedCase ? (
+                    <>
+                        {/* Detail Header */}
+                        <div style={{ padding: '1.5rem', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                            <div>
+                                <h2 style={{ fontSize: '1.8rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                                    Case #{selectedCase.id.slice(0, 6)}
+                                    {selectedCase.severity === 'Critical' && <span style={{ fontSize: '0.8rem', background: '#ef4444', color: 'white', padding: '0.2rem 0.6rem', borderRadius: '12px' }}>CRITICAL</span>}
+                                </h2>
+                                <div style={{ display: 'flex', gap: '1.5rem', marginTop: '0.5rem', color: 'var(--text-muted)' }}>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><User size={16} /> Farmer: {selectedCase.farmName || 'Unknown'}</span>
+                                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}><Activity size={16} /> Detection: {selectedCase.diseaseName || 'Analysis Pending'}</span>
+                                </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {['Pending', 'In Progress', 'Resolved'].map(s => (
+                                    <button
+                                        key={s}
+                                        onClick={() => handleUpdateStatus(s)}
+                                        style={{
+                                            padding: '0.5rem 1rem', borderRadius: '6px', border: '1px solid var(--border-color)', cursor: 'pointer',
+                                            background: selectedCase.status === s ? 'var(--accent-primary)' : 'transparent',
+                                            color: selectedCase.status === s ? 'white' : 'var(--text-muted)'
+                                        }}
+                                    >
+                                        {s}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Workspace Content */}
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '2rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+
+                            {/* Left: Clinical Data */}
+                            <div>
+                                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent-primary)' }}>Clinical Report</h3>
+                                <div style={{ background: 'var(--bg-tertiary)', borderRadius: '12px', padding: '1.5rem', marginBottom: '1.5rem' }}>
+                                    {selectedCase.imageUrl && (
+                                        <img src={selectedCase.imageUrl} alt="Scan" style={{ width: '100%', height: '200px', objectFit: 'cover', borderRadius: '8px', marginBottom: '1rem' }} />
+                                    )}
+                                    <div style={{ marginBottom: '1rem' }}>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>AI Confidence Score</label>
+                                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{selectedCase.confidence ? (selectedCase.confidence * 100).toFixed(1) + '%' : 'N/A'}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Symptoms Detected</label>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            {selectedCase.symptoms ? selectedCase.symptoms.map(s => (
+                                                <span key={s} style={{ background: 'white', padding: '0.2rem 0.6rem', borderRadius: '12px', fontSize: '0.85rem', border: '1px solid var(--border-color)' }}>{s}</span>
+                                            )) : <span style={{ fontStyle: 'italic', color: 'var(--text-muted)' }}>No specific symptoms logged</span>}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right: Treatment & Notes */}
+                            <TreatmentPanel caseId={selectedCase.id} existingNotes={selectedCase.clinicalNotes || []} />
+
+                        </div>
+                    </>
+                ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)', flexDirection: 'column', gap: '1rem' }}>
+                        <Stethoscope size={48} opacity={0.2} />
+                        <p>Select a case from the list to view details.</p>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+function TreatmentPanel({ caseId, existingNotes }) {
+    const [note, setNote] = useState('');
+    const [notesList, setNotesList] = useState(existingNotes);
+
+    const handleAddNote = async () => {
+        if (!note.trim()) return;
+        const noteObj = { text: note, author: 'Vet', type: 'Note', timestamp: new Date().toISOString() };
+        await VetCaseService.addClinicalNote(caseId, noteObj);
+        setNotesList([...notesList, noteObj]);
+        setNote('');
+    };
+
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--accent-primary)' }}>Initial Treatment & Notes</h3>
+
+            {/* Notes History */}
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {notesList.length > 0 ? notesList.map((n, i) => (
+                    <div key={i} style={{ background: 'white', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                        <p style={{ fontSize: '0.95rem', lineHeight: '1.5' }}>{n.text}</p>
+                        <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: 'var(--text-dim)', textAlign: 'right' }}>
+                            {new Date(n.timestamp).toLocaleString()} • {n.author}
+                        </div>
+                    </div>
+                )) : (
+                    <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', background: 'var(--bg-tertiary)', borderRadius: '8px' }}>
+                        No clinical notes added yet.
+                    </div>
+                )}
+            </div>
+
+            {/* Input */}
+            <div style={{ marginTop: 'auto' }}>
+                <textarea
+                    className="input-field"
+                    rows="4"
+                    placeholder="Type clinical observations or treatment plan..."
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    style={{ marginBottom: '1rem' }}
+                />
+                <button
+                    className="btn-primary"
+                    onClick={handleAddNote}
+                    style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem' }}
+                >
+                    <Save size={18} /> Add Clinical Note
+                </button>
             </div>
         </div>
     );

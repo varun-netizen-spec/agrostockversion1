@@ -8,7 +8,7 @@ export default function NotificationsPanel({ userData }) {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (userData) {
+        if (userData?.uid) {
             generateNotifications();
         }
     }, [userData]);

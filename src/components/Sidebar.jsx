@@ -11,9 +11,12 @@ import {
     ClipboardList,
     Package,
     ScanLine,
-    Stethoscope
+    Stethoscope,
+    Users
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+
+import logo from '../assets/logo.jpg';
 
 export default function Sidebar() {
     const { logout, userData } = useAuth();
@@ -32,9 +35,17 @@ export default function Sidebar() {
         <aside className="sidebar">
             <div style={{ marginBottom: '3rem', display: 'flex', justifyContent: 'center' }}>
                 <div style={{ textAlign: 'center' }}>
-                    <div style={{ width: '60px', height: '60px', background: 'var(--accent-primary)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-                        <span style={{ fontSize: '1.5rem', fontWeight: 'bold', color: '#000' }}>AS</span>
-                    </div>
+                    <img
+                        src={logo}
+                        alt="AgroStock Logo"
+                        style={{
+                            width: '80px',
+                            height: '80px',
+                            objectFit: 'contain',
+                            borderRadius: '12px',
+                            margin: '0 auto 0.5rem'
+                        }}
+                    />
                     <h2 style={{ color: 'var(--accent-primary)', fontSize: '1.25rem', fontWeight: '800', letterSpacing: '1px' }}>
                         AGROSTOCK
                     </h2>
@@ -52,12 +63,13 @@ export default function Sidebar() {
                         <SidebarLink to="/health" icon={<Activity size={20} />} label="Health & AI Vet" />
                         <SidebarLink to="/scan" icon={<ScanLine size={20} />} label="Health Scanner" />
                         <SidebarLink to="/inventory" icon={<Package size={20} />} label="My Products" />
+                        <SidebarLink to="/cooperative" icon={<Users size={20} />} label="Co-op Network" />
                     </>
                 )}
 
-                {/* Vet Only Links */}
+                {/* Vet Specific Links are now handled via Dashboard View, but we can give them shortcuts */}
                 {(userData?.role === 'vet' || userData?.role === 'admin') && (
-                    <SidebarLink to="/vet-portal" icon={<Stethoscope size={20} />} label="Vet Portal" />
+                    <SidebarLink to="/scan" icon={<ScanLine size={20} />} label="Scan Tool" />
                 )}
 
                 <div style={{ margin: '1rem 0', borderTop: '1px solid var(--border-color)', opacity: 0.5 }} />
@@ -65,9 +77,16 @@ export default function Sidebar() {
                 {/* Common Links (Marketplace) - Hidden for Vets */}
                 {userData?.role !== 'vet' && (
                     <>
-                        <SidebarLink to="/marketplace" icon={<ShoppingBag size={20} />} label="Marketplace" />
+                        {/* Hide Buy Marketplace for Farmers */}
+                        {userData?.role !== 'farmer' && (
+                            <SidebarLink to="/marketplace" icon={<ShoppingBag size={20} />} label="Marketplace" />
+                        )}
                         <SidebarLink to="/orders" icon={<ClipboardList size={20} />} label="Orders" />
                     </>
+                )}
+                {/* Buyer Only Link */}
+                {userData?.role === 'buyer' && (
+                    <SidebarLink to="/buyer-profile" icon={<UserCircle size={20} />} label="My Profile" />
                 )}
             </nav>
 

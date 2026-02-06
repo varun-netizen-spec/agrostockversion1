@@ -226,6 +226,7 @@ export const MarketplaceService = {
                 transaction.set(doc(orderRef), {
                     ...orderData,
                     farmerDetails,
+                    freshnessScore: Math.floor(Math.random() * (100 - 90 + 1)) + 90, // Mock 90-100% freshness
                     timestamp: new Date().toISOString()
                 });
             });
@@ -265,11 +266,64 @@ export const MarketplaceService = {
 
             if (status === 'Accepted') updateData.acceptedAt = new Date().toISOString();
             if (status === 'Rejected') updateData.rejectedAt = new Date().toISOString();
+            if (status === 'Out for Delivery') {
+                updateData.deliveryStartedAt = new Date().toISOString();
+                // Simulate 30-min delivery
+                updateData.estimatedDeliveryTime = new Date(Date.now() + 30 * 60000).toISOString();
+            }
             if (status === 'Delivered') updateData.deliveredAt = new Date().toISOString();
 
             await updateDoc(orderRef, updateData);
         } catch (error) {
             console.error("Error updating status:", error);
+            throw error;
+        }
+    },
+
+    async completeOrder(orderId, paymentMethod, amount, farmerId) {
+        try {
+            await runTransaction(db, async (transaction) => {
+                // 1. READS FIRST
+                const orderRef = doc(db, 'orders', orderId);
+                const orderDoc = await transaction.get(orderRef);
+
+                if (!orderDoc.exists()) throw new Error("Order not found!");
+                const orderData = orderDoc.data();
+
+                if (orderData.status === 'Completed') throw new Error("Order already completed.");
+
+                let walletRef;
+                let walletSnap;
+
+                if (paymentMethod === 'COD') {
+                    walletRef = doc(db, 'wallets', farmerId);
+                    walletSnap = await transaction.get(walletRef);
+                }
+
+                // 2. WRITES SECOND
+                transaction.update(orderRef, {
+                    status: 'Completed',
+                    completedAt: new Date().toISOString()
+                });
+
+                if (paymentMethod === 'COD') {
+                    if (walletSnap.exists()) {
+                        transaction.update(walletRef, {
+                            balance: (walletSnap.data().balance || 0) + amount,
+                            updatedAt: new Date().toISOString()
+                        });
+                    } else {
+                        transaction.set(walletRef, {
+                            farmerId: farmerId,
+                            balance: amount,
+                            updatedAt: new Date().toISOString()
+                        });
+                    }
+                }
+            });
+            return { success: true };
+        } catch (error) {
+            console.error("Order Completion Failed:", error);
             throw error;
         }
     },

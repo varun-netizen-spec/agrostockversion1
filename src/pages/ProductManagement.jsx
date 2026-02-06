@@ -15,6 +15,17 @@ export default function ProductManagement() {
     const [newProduct, setNewProduct] = useState({ name: '', category: 'Milk', price: '', quantity: '', unit: 'Liter', status: 'Active' });
     const [farmName, setFarmName] = useState('');
     const [farmRisk, setFarmRisk] = useState('Low');
+    const [cattleList, setCattleList] = useState([]);
+
+    const fetchCattle = async () => {
+        if (!userData?.uid) return;
+        try {
+            const cattle = await CattleService.getAllCattle(userData.uid);
+            setCattleList(cattle);
+        } catch (error) {
+            console.error("Error fetching cattle:", error);
+        }
+    };
 
     const fetchFarmName = async () => {
         if (!userData?.uid) return;
@@ -60,6 +71,7 @@ export default function ProductManagement() {
         fetchProducts();
         fetchFarmName();
         checkFarmHealth();
+        fetchCattle();
 
         // Polling (15s) to catch stock changes from sales
         const interval = setInterval(() => {
@@ -73,13 +85,19 @@ export default function ProductManagement() {
     const handleAddProduct = async (e) => {
         e.preventDefault();
         try {
+            const selectedCattle = cattleList.find(c => c.id === newProduct.sourceCattleId);
+
             await MarketplaceService.addProduct({
                 ...newProduct,
                 price: parseFloat(newProduct.price),
                 quantity: parseFloat(newProduct.quantity),
                 farmerId: userData.uid,
                 farmName: farmName || 'Local Farm',
-                healthRisk: farmRisk // Auto-tag product with current farm risk
+                healthRisk: farmRisk, // Auto-tag product with current farm risk
+                sourceCattleId: selectedCattle?.id || null,
+                sourceCattleTag: selectedCattle?.tagId || null,
+                productionDate: new Date().toISOString(),
+                healthVerified: selectedCattle ? (farmRisk === 'Low') : false
             });
             setShowModal(false);
             setNewProduct({ name: '', category: 'Milk', price: '', quantity: '', unit: 'Liter', status: 'Active' });
@@ -263,7 +281,26 @@ export default function ProductManagement() {
                                         </select>
                                     </div>
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+
+                                {/* Source Cattle Selection */}
+                                <div className="input-group" style={{ marginTop: '1rem' }}>
+                                    <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Source Cattle (Optional - For Traceability)</label>
+                                    <select
+                                        className="input-field"
+                                        value={newProduct.sourceCattleId || ''}
+                                        onChange={(e) => setNewProduct({ ...newProduct, sourceCattleId: e.target.value })}
+                                    >
+                                        <option value="">-- Select Cattle --</option>
+                                        {cattleList.map(cow => (
+                                            <option key={cow.id} value={cow.id}>{cow.tagId} ({cow.breed})</option>
+                                        ))}
+                                    </select>
+                                    <p style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.25rem' }}>
+                                        Linking a healthy animal adds a "Verified" badge to your product.
+                                    </p>
+                                </div>
+
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem' }}>
                                     <div className="input-group">
                                         <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem' }}>Price (₹)</label>
                                         <input

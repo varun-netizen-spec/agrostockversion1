@@ -65,43 +65,94 @@ export const GeminiService = {
 
     async generateBusinessInsights(salesData) {
         if (!genAI) return "AI Insights Unavailable (Key Missing)";
-        try {
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const prompt = `
-                You are a Business Intelligence Analyst for a dairy farm. Analyze the following sales data JSON:
-                ${JSON.stringify(salesData)}
 
-                Identify 3 key insights:
-                1. Best performing products.
-                2. Peak sales times (morning/evening).
-                3. Actionable advice to increase profit (e.g., "Stock more Paneer for Friday evenings").
+        const models = ["gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
+        for (const modelName of models) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const prompt = `
+                    You are a Business Intelligence Analyst for a dairy farm. Analyze the following sales data JSON:
+                    ${JSON.stringify(salesData)}
+    
+                    Identify 3 key insights:
+                    1. Best performing products.
+                    2. Peak sales times (morning/evening).
+                    3. Actionable advice to increase profit (e.g., "Stock more Paneer for Friday evenings").
+    
+                    Format the output as a clean JSON object with this structure (no markdown):
+                    {
+                        "insights": [
+                            { "title": "Insight Title", "description": "Short explanation", "type": "positive/warning/tip" }
+                        ],
+                        "recommendation": "One main actionable advice sentence."
+                    }
+                `;
 
-                Format the output as a clean JSON object with this structure (no markdown):
-                {
-                    "insights": [
-                        { "title": "Insight Title", "description": "Short explanation", "type": "positive/warning/tip" }
-                    ],
-                    "recommendation": "One main actionable advice sentence."
-                }
-            `;
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                let text = response.text();
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            let text = response.text();
-
-            // Clean markdown code blocks if present
-            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-            return JSON.parse(text);
-        } catch (error) {
-            console.error("Gemini Business Insight Error:", error);
-            // Fallback mock data if AI fails
-            return {
-                insights: [
-                    { title: "Data Analysis Failed", description: "Could not generate live insights.", type: "warning" }
-                ],
-                recommendation: "Check your sales reports manually."
-            };
+                text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(text);
+            } catch (error) {
+                console.warn(`Gemini Business Insights Failed with ${modelName}:`, error.message);
+            }
         }
+
+        // Fallback mock data if ALL AI models fail
+        console.error("All Gemini Models Failed for Insights");
+        return {
+            insights: [
+                { title: "AI Analysis Failed", description: "Could not generate live insights due to API limits.", type: "warning" }
+            ],
+            recommendation: "Please review your sales reports manually."
+        };
+    },
+
+    async generateDemandForecast(analyticsData) {
+        if (!genAI) return null;
+
+        const models = ["gemini-1.5-flash", "gemini-pro", "gemini-1.0-pro"];
+        for (const modelName of models) {
+            try {
+                const model = genAI.getGenerativeModel({ model: modelName });
+                const prompt = `
+                    You are a Supply Chain AI Expert for a local dairy marketplace.
+                    Analyze the following Daily Sales Trend (Last 30 days) and Product Performance:
+                    ${JSON.stringify({
+                    dailyTrend: analyticsData.dailyTrend,
+                    topProducts: analyticsData.topProducts
+                })}
+    
+                    Your Task: Predict demand for the UPCOMING week and suggest actions.
+                    
+                    Return a JSON object with this structure (NO MARKDOWN):
+                    {
+                        "forecast": [
+                            { "day": "Monday", "predictedVolume": "High/Medium/Low", "reason": "Historical peak observed" },
+                            { "day": "Tuesday", "predictedVolume": "Medium", "reason": "Steady mid-week trend" }
+                            // ... for next 3-4 days
+                        ],
+                        "inventoryActions": [
+                             { "product": "Milk", "action": "Increase stock by 20%", "urgency": "High" },
+                             { "product": "Paneer", "action": "Maintain current levels", "urgency": "Low" }
+                        ],
+                        "pricingStrategy": "Brief advice on dynamic pricing based on upcoming demand (e.g., 'Increase Milk price by ₹2 this weekend due to high demand')."
+                    }
+                `;
+
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                let text = response.text();
+
+                text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                return JSON.parse(text);
+            } catch (error) {
+                console.warn(`Gemini Forecast Failed with ${modelName}:`, error.message);
+            }
+        }
+
+        console.error("All Gemini Models Failed for Forecast");
+        return null;
     }
 };
