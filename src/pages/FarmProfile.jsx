@@ -140,6 +140,20 @@ export default function FarmProfile() {
                         </select>
                     </div>
 
+                    <div className="input-group">
+                        <label className="input-label">Ownership Status</label>
+                        <select
+                            className="input-field"
+                            value={formData.ownershipStatus || 'Owned'}
+                            onChange={(e) => setFormData({ ...formData, ownershipStatus: e.target.value })}
+                        >
+                            <option value="Owned">Owned</option>
+                            <option value="Leased">Leased</option>
+                            <option value="Family Owned">Family Owned</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+
                     <h3 style={{ gridColumn: 'span 2', fontSize: '1.125rem', color: 'var(--accent-primary)', marginTop: '2rem' }}>Farm Overview</h3>
                     <div className="input-group" style={{ gridColumn: 'span 2' }}>
                         <label className="input-label">Farm Name</label>

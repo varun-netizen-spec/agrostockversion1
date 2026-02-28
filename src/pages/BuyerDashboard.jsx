@@ -24,11 +24,17 @@ export default function BuyerDashboard() {
         try {
             setLoading(true);
 
-            // 1. Fetch Recent Orders for Reorder
-            const q = query(collection(db, 'orders'), where('buyerId', '==', userData.uid), orderBy('createdAt', 'desc'), limit(5));
-            const orderSnaps = await getDocs(q);
-            const orders = orderSnaps.docs.map(d => ({ id: d.id, ...d.data() }));
-            setRecentOrders(orders);
+            // 1. Fetch Recent Orders for Reorder (With Fallback)
+            try {
+                const q = query(collection(db, 'orders'), where('buyerId', '==', userData.uid), orderBy('createdAt', 'desc'), limit(5));
+                const orderSnaps = await getDocs(q);
+                setRecentOrders(orderSnaps.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (indexError) {
+                console.warn("BuyerDashboard: Index missing, falling back to unordered query");
+                const fallbackQ = query(collection(db, 'orders'), where('buyerId', '==', userData.uid), limit(5));
+                const orderSnaps = await getDocs(fallbackQ);
+                setRecentOrders(orderSnaps.docs.map(d => ({ id: d.id, ...d.data() })));
+            }
 
             // 2. Fetch "Trending" (Simulated by getting high-rated or random products)
             const allProducts = await MarketplaceService.getAllProducts();

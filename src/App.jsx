@@ -15,6 +15,7 @@ import CattleHealthScanner from './pages/CattleHealthScanner';
 import Payment from './pages/Payment';
 import VetDashboard from './pages/VetDashboard';
 import BuyerProfile from './pages/BuyerProfile';
+import DoctorProfile from './pages/DoctorProfile';
 
 
 // Protected Layout Component
@@ -53,6 +54,7 @@ function App() {
                     <Route path="/payment" element={<ProtectedLayout><Payment /></ProtectedLayout>} />
                     <Route path="/scan" element={<ProtectedLayout><CattleHealthScanner /></ProtectedLayout>} />
                     <Route path="/vet-portal" element={<ProtectedLayout><VetDashboard /></ProtectedLayout>} />
+                    <Route path="/doctor-profile" element={<ProtectedLayout><DoctorProfile /></ProtectedLayout>} />
 
                     {/* Buyer Routes */}
                     <Route path="/buyer-profile" element={<ProtectedLayout><BuyerProfile /></ProtectedLayout>} />

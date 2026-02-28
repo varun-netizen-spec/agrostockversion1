@@ -67,9 +67,9 @@ export default function Sidebar() {
                     </>
                 )}
 
-                {/* Vet Specific Links are now handled via Dashboard View, but we can give them shortcuts */}
+                {/* Vet Specific Links */}
                 {(userData?.role === 'vet' || userData?.role === 'admin') && (
-                    <SidebarLink to="/scan" icon={<ScanLine size={20} />} label="Scan Tool" />
+                    <SidebarLink to="/doctor-profile" icon={<UserCircle size={20} />} label="My Profile" />
                 )}
 
                 <div style={{ margin: '1rem 0', borderTop: '1px solid var(--border-color)', opacity: 0.5 }} />
