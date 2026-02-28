@@ -63,7 +63,7 @@ export default function Sidebar() {
                         <SidebarLink to="/health" icon={<Activity size={20} />} label="Health & AI Vet" />
                         <SidebarLink to="/scan" icon={<ScanLine size={20} />} label="Health Scanner" />
                         <SidebarLink to="/inventory" icon={<Package size={20} />} label="My Products" />
-                        <SidebarLink to="/cooperative" icon={<Users size={20} />} label="Co-op Network" />
+
                     </>
                 )}
 

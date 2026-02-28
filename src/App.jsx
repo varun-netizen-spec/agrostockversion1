@@ -15,7 +15,7 @@ import CattleHealthScanner from './pages/CattleHealthScanner';
 import Payment from './pages/Payment';
 import VetDashboard from './pages/VetDashboard';
 import BuyerProfile from './pages/BuyerProfile';
-import CooperativeDashboard from './pages/CooperativeDashboard';
+
 
 // Protected Layout Component
 function ProtectedLayout({ children }) {
@@ -57,8 +57,7 @@ function App() {
                     {/* Buyer Routes */}
                     <Route path="/buyer-profile" element={<ProtectedLayout><BuyerProfile /></ProtectedLayout>} />
 
-                    {/* Cooperative Routes */}
-                    <Route path="/cooperative" element={<ProtectedLayout><CooperativeDashboard /></ProtectedLayout>} />
+
                 </Routes>
             </Router>
         </AuthProvider>

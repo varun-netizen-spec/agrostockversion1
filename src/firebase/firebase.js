@@ -5,12 +5,12 @@ import { getFirestore } from "firebase/firestore";
 // TODO: Replace with your actual Firebase project configuration
 // These should ideally be environment variables in a real production app.
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID
+  apiKey: "AIzaSyDaESotubVshORiR7HSzX33ToWCgBjOjYA",
+  authDomain: "agrostock-b2647.firebaseapp.com",
+  projectId: "agrostock-b2647",
+  storageBucket: "agrostock-b2647.firebasestorage.app",
+  messagingSenderId: "814448518129",
+  appId: "1:814448518129:web:95c2d36c7a33d08ce35a50"
 };
 
 const app = initializeApp(firebaseConfig);
