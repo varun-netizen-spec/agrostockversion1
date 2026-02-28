@@ -23,7 +23,7 @@ export default function Payment() {
 
     // Buyer Information
     const [buyerInfo, setBuyerInfo] = useState({
-        name: userData?.displayName || '',
+        name: userData?.displayName || userData?.email?.split('@')[0] || '',
         location: '',
         phone: ''
     });
@@ -44,8 +44,10 @@ export default function Payment() {
     const [locking, setLocking] = useState(true);
     const lockedItemsRef = React.useRef([]);
     const hasLockedRef = React.useRef(false);
+    const isMounted = React.useRef(true);
 
     React.useEffect(() => {
+        isMounted.current = true;
         const lockInventory = async () => {
             if (hasLockedRef.current) return;
             hasLockedRef.current = true;
@@ -55,8 +57,8 @@ export default function Payment() {
                     MarketplaceService.lockStock(item.id, item.qty, userData.uid)
                 );
                 await Promise.all(promises);
-                lockedItemsRef.current = cartItems; // Track successfully locked items
-                if (mountedRef.current) setLocking(false);
+                lockedItemsRef.current = cartItems;
+                if (isMounted.current) setLocking(false);
             } catch (error) {
                 console.error("Locking Error:", error);
                 alert("Some items are no longer available. Returning to marketplace.");
@@ -64,16 +66,14 @@ export default function Payment() {
             }
         };
 
-        let mounted = true;
-        const mountedRef = { current: true };
-
-        if (userData?.uid) {
+        if (userData?.uid && cartItems.length > 0) {
             lockInventory();
+        } else if (userData?.uid && cartItems.length === 0) {
+            setLocking(false);
         }
 
         return () => {
-            mounted = false;
-            mountedRef.current = false;
+            isMounted.current = false;
             // Cleanup: Unlock stock when leaving (if not purchased)
             if (lockedItemsRef.current.length > 0) {
                 lockedItemsRef.current.forEach(item => {
@@ -81,7 +81,7 @@ export default function Payment() {
                 });
             }
         };
-    }, []);
+    }, [userData, cartItems.length]);
 
     if (locking) {
         return (
@@ -125,7 +125,7 @@ export default function Payment() {
                 try {
                     await MarketplaceService.placeOrderAtomic({
                         buyerId: userData.uid,
-                        buyerName: buyerInfo.name || userData.displayName || userData.email.split('@')[0],
+                        buyerName: buyerInfo.name || userData.displayName || userData.email?.split('@')[0] || 'Buyer',
                         buyerLocation: buyerInfo.location,
                         buyerPhone: buyerInfo.phone,
                         farmerId: item.farmerId,
