@@ -100,4 +100,5 @@ AgroStock is a Next-Gen Dairy Farm Management & Marketplace Platform. It bridges
 1. **Install Dependencies**: `npm install`
 2. **Start Dev Server**: `npm run dev`
 3. **Build for Production**: `npm run build`
+<<<<<<< HEAD
 4. **Deploy to Web**: `firebase deploy`
